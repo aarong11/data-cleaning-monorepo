@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import DatasetModel from '../models/dataset.model';
 import RecordModel from '../models/record.model';
-import { Dataset, DatasetStatus, RecordResponse, Record, DatasetProcessingJob, QUEUES } from 'shared/types';
+import { Dataset, DatasetStatus, RecordResponse, Record, DatasetProcessingJob, QUEUES } from 'shared';
 import { parseCSV, processRecordsWithAI } from '../utils/file.utils';
 import path from 'path';
 import { sendToQueue } from '../config/rabbitmq';

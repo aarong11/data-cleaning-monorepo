@@ -1,5 +1,5 @@
 import * as amqp from 'amqplib';
-import { QUEUES } from 'shared/types';
+import { QUEUES } from 'shared';
 
 // RabbitMQ connection URL - can be loaded from environment variables
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';

@@ -3,14 +3,20 @@
     "target": "es2020",
     "module": "commonjs",
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "baseUrl": ".",
-    "composite": true
+    "composite": true,
+    "paths": {
+      "shared/*": ["../shared/*"]
+    }
   },
   "include": ["src/**/*"],
+  "references": [
+    { "path": "../shared" }
+  ]
 }

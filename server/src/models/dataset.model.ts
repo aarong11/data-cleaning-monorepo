@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
-import { Dataset } from 'shared/types';
+import { Dataset } from 'shared';
 
 const DatasetSchema = new Schema<Dataset>({
   datasetId: {

@@ -1,0 +1,120 @@
+// filepath: /Users/a/projects/data-cleaning-monorepo/server/src/services/auth.service.ts
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import UserModel, { UserDocument } from '../models/user.model';
+import { AuthResponse, LoginRequest, RegisterRequest, UserResponse } from 'shared';
+import config from '../config';
+
+export class AuthService {
+  /**
+   * Register a new user
+   */
+  async register(userData: RegisterRequest): Promise<AuthResponse | null> {
+    try {
+      // Check if the user already exists
+      const existingUser = await UserModel.findOne({ email: userData.email });
+      if (existingUser) {
+        return null;
+      }
+
+      // Create a new user
+      const user = new UserModel({
+        userId: uuidv4(),
+        email: userData.email,
+        password: userData.password,
+        role: userData.role || 'user',
+        createdAt: new Date()
+      });
+
+      // Save the user to database
+      await user.save();
+
+      // Generate JWT token
+      const token = this.generateToken(user.userId, user.email);
+
+      // Return user info and token
+      return {
+        token,
+        user: {
+          userId: user.userId,
+          email: user.email,
+          role: user.role
+        }
+      };
+    } catch (error) {
+      console.error('Error registering user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Login a user
+   */
+  async login(loginData: LoginRequest): Promise<AuthResponse | null> {
+    try {
+      // Find the user by email
+      const user = await UserModel.findOne({ email: loginData.email });
+      if (!user) {
+        return null;
+      }
+
+      // Check if the password is correct
+      const isPasswordValid = await user.comparePassword(loginData.password);
+      if (!isPasswordValid) {
+        return null;
+      }
+
+      // Update last login time
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      // Generate JWT token
+      const token = this.generateToken(user.userId, user.email);
+
+      // Return user info and token
+      return {
+        token,
+        user: {
+          userId: user.userId,
+          email: user.email,
+          role: user.role
+        }
+      };
+    } catch (error) {
+      console.error('Error logging in user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate JWT token
+   */
+  private generateToken(userId: string, email: string): string {
+    return jwt.sign(
+      { userId, email },
+      config.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+  }
+
+  /**
+   * Get user by ID
+   */
+  async getUserById(userId: string): Promise<UserResponse | null> {
+    try {
+      const user = await UserModel.findOne({ userId });
+      if (!user) {
+        return null;
+      }
+
+      return {
+        userId: user.userId,
+        email: user.email,
+        role: user.role
+      };
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
+  }
+}

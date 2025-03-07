@@ -5,8 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "start": "./node_modules/.bin/ts-node src/index.ts",
     "watch": "tsc --watch"
   },
   "dependencies": {
@@ -15,7 +14,8 @@
     "csv-parse": "^5.6.0",
     "dotenv": "^16.4.7",
     "mongoose": "^8.12.1",
-    "shared": "*"
+    "shared": "*",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.7",

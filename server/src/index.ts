@@ -1,3 +1,6 @@
+// Register module aliases
+import 'module-alias/register';
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';

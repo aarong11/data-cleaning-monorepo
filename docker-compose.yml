@@ -39,18 +39,14 @@ services:
     container_name: dataset-cleaning-api
     restart: always
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     volumes:
       - .:/app
       - /app/server/node_modules
       - /app/shared/node_modules
+    env_file:
+      - .env
     environment:
-      - PORT=3000
-      - MONGODB_URI=mongodb://mongodb:27017/dataset-cleaning
-      - JWT_SECRET=your-secret-key
-      - UPLOAD_DIR=/tmp/uploads
-      - S3_BUCKET=your-dataset-bucket
-      - S3_REGION=us-east-1
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
     depends_on:
       - mongodb
@@ -69,10 +65,9 @@ services:
       - .:/app
       - /app/worker/node_modules
       - /app/shared/node_modules
+    env_file:
+      - .env
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/dataset-cleaning
-      - S3_BUCKET=your-dataset-bucket
-      - S3_REGION=us-east-1
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
     depends_on:
       - mongodb

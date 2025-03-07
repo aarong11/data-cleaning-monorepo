@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
-import { Record } from 'shared/types';
+import { Record } from 'shared';
 
 const RecordSchema = new Schema<Record>({
   datasetId: {

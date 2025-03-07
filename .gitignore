@@ -17,6 +17,10 @@ build/
 
 # Environment variables
 .env
+
+# Keep example env file
+!.env.example
+
 .env.local
 .env.*.local
 
