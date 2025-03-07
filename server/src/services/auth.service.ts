@@ -1,7 +1,8 @@
-// filepath: /Users/a/projects/data-cleaning-monorepo/server/src/services/auth.service.ts
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import UserModel, { UserDocument } from '../models/user.model';
+import { User } from 'shared';
+import { UserModel } from 'shared/models';
+
 import { AuthResponse, LoginRequest, RegisterRequest, UserResponse } from 'shared';
 import config from '../config';
 
@@ -29,7 +30,7 @@ export class AuthService {
       // Save the user to database
       await user.save();
 
-      // Generate JWT token
+      // Generate JWT token using userId
       const token = this.generateToken(user.userId, user.email);
 
       // Return user info and token
@@ -68,7 +69,7 @@ export class AuthService {
       user.lastLoginAt = new Date();
       await user.save();
 
-      // Generate JWT token
+      // Generate JWT token using userId
       const token = this.generateToken(user.userId, user.email);
 
       // Return user info and token
@@ -102,7 +103,8 @@ export class AuthService {
    */
   async getUserById(userId: string): Promise<UserResponse | null> {
     try {
-      const user = await UserModel.findOne({ userId });
+      // Find where userId = userId
+      const user = await UserModel.findOne({ userId: userId });
       if (!user) {
         return null;
       }

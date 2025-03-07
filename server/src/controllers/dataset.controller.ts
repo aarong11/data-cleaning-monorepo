@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { DatasetService } from '../services/dataset.service';
-import { saveToS3, ensureUploadDir, generateUniqueFilename } from '../utils/file.utils';
+import { uploadToS3, ensureUploadDir, generateUniqueFilename } from '../utils/file.utils';
 import path from 'path';
 import fs from 'fs';
 import config from '../config';
@@ -12,11 +12,13 @@ const datasetService = new DatasetService();
 // Configure multer for file uploads
 ensureUploadDir();
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
+  destination: (_req: Express.Request, _file: Express.Multer.File, cb) => {
+    ensureUploadDir();
     cb(null, config.UPLOAD_DIR);
   },
-  filename: (_req, file, cb) => {
-    cb(null, generateUniqueFilename(file.originalname));
+  filename: (req: Express.Request, file: Express.Multer.File, cb) => {
+    const uniqueName = generateUniqueFilename(file.originalname);
+    cb(null, uniqueName);
   },
 });
 
@@ -38,8 +40,9 @@ export class DatasetController {
 
       const { filename, path: filePath, size } = req.file;
       
-      // Upload to S3
-      const s3Link = await saveToS3(filePath, filename);
+      // Read file into buffer and upload to S3
+      const fileBuffer = fs.readFileSync(filePath);
+      const s3Link = await uploadToS3(fileBuffer, filename);
       
       // Create dataset record
       const dataset = await datasetService.createDataset(

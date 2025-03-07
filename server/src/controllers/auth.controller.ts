@@ -76,6 +76,8 @@ export class AuthController {
         return;
       }
 
+      console.log('Get profile for user:', userId);
+
       const user = await this.authService.getUserById(userId);
       if (!user) {
         res.status(404).json({ message: 'User not found' });

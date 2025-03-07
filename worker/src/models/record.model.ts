@@ -1,8 +1,8 @@
 import mongoose, { Schema } from 'mongoose';
-import { Record } from 'shared/types';
+import { RecordModel } from 'shared/models';
 
 // Define the record schema
-const recordSchema = new Schema<Record>({
+const recordSchema = new Schema<typeof RecordModel>({
   datasetId: { type: String, required: true },
   index: { type: Number, required: true },
   data: { type: Schema.Types.Mixed, required: true },
@@ -17,4 +17,4 @@ const recordSchema = new Schema<Record>({
 recordSchema.index({ datasetId: 1, index: 1 }, { unique: true });
 
 // Create and export the record model
-export default mongoose.model<Record>('Record', recordSchema);
+export default RecordModel;

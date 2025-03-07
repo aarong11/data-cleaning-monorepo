@@ -9,6 +9,11 @@ export interface AuthRequest extends Request {
   };
 }
 
+interface JWTPayload {
+  userId: string;
+  email: string;
+}
+
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
@@ -18,7 +23,8 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, config.JWT_SECRET) as { userId: string; email: string };
+    console.log(token);
+    const decoded = jwt.verify(token, config.JWT_SECRET) as JWTPayload;
 
     req.user = decoded;
     next();

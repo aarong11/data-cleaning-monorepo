@@ -3,10 +3,10 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import config from '../config';
 import { parse } from 'csv-parse';
-import AWS from 'aws-sdk';
+import { S3 } from 'aws-sdk';
 
 // Configure the AWS SDK
-const s3 = new AWS.S3({
+const s3 = new S3({
   region: config.S3_REGION
 });
 
@@ -25,23 +25,17 @@ export const generateUniqueFilename = (originalFilename: string): string => {
 };
 
 // Save a file to S3 and return the link
-export const saveToS3 = async (
-  localFilePath: string,
+export const uploadToS3 = async (
+  fileBuffer: Buffer,
   filename: string
 ): Promise<string> => {
-  const fileContent = fs.readFileSync(localFilePath);
-  
   const params = {
     Bucket: config.S3_BUCKET,
     Key: filename,
-    Body: fileContent,
+    Body: fileBuffer
   };
-  
+
   const uploadResult = await s3.upload(params).promise();
-  
-  // Clean up the local file after upload
-  fs.unlinkSync(localFilePath);
-  
   return uploadResult.Location;
 };
 

@@ -1,13 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import DatasetModel from '../models/dataset.model';
-import RecordModel from '../models/record.model';
-import { Dataset, DatasetStatus, RecordResponse, Record, DatasetProcessingJob, QUEUES } from 'shared';
+import { DatasetModel, RecordModel } from 'shared/models';
+import { Dataset as DatasetType, DatasetStatus, RecordResponse, Record as RecordType, DatasetProcessingJob, QUEUES } from 'shared';
 import { parseCSV, processRecordsWithAI } from '../utils/file.utils';
 import path from 'path';
 import { sendToQueue } from '../config/rabbitmq';
 
 export class DatasetService {
-  async createDataset(userId: string, filename: string, size: number, link: string): Promise<Dataset> {
+  async createDataset(userId: string, filename: string, size: number, link: string): Promise<DatasetType> {
     const datasetId = uuidv4();
     
     const dataset = new DatasetModel({
@@ -24,14 +23,14 @@ export class DatasetService {
     return dataset;
   }
 
-  async getDatasetsByUserId(userId: string, limit = 10, offset = 0): Promise<Dataset[]> {
+  async getDatasetsByUserId(userId: string, limit = 10, offset = 0): Promise<DatasetType[]> {
     return DatasetModel.find({ userId })
       .sort({ uploadedAt: -1 })
       .skip(offset)
       .limit(limit);
   }
 
-  async getDatasetById(datasetId: string): Promise<Dataset | null> {
+  async getDatasetById(datasetId: string): Promise<DatasetType | null> {
     return DatasetModel.findOne({ datasetId });
   }
 
@@ -51,7 +50,7 @@ export class DatasetService {
     return true;
   }
 
-  async processDataset(datasetId: string, userId: string): Promise<Dataset | null> {
+  async processDataset(datasetId: string, userId: string): Promise<DatasetType | null> {
     const dataset = await DatasetModel.findOne({ datasetId, userId });
     
     if (!dataset || dataset.status !== 'uploaded') {

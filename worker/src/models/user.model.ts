@@ -1,9 +1,8 @@
-// filepath: /Users/a/projects/data-cleaning-monorepo/worker/src/models/user.model.ts
 import mongoose, { Schema } from 'mongoose';
-import { User } from 'shared/types';
+import { UserModel } from 'shared/models';
 
 // Define the user schema
-const userSchema = new Schema<User>({
+const userSchema = new Schema<typeof UserModel>({
   userId: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true, trim: true, lowercase: true },
   password: { type: String, required: true },
@@ -13,4 +12,4 @@ const userSchema = new Schema<User>({
 });
 
 // Create and export the user model
-export default mongoose.model<User>('User', userSchema);
+export default UserModel;

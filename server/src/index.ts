@@ -30,9 +30,14 @@ app.get('/health', (_req, res) => {
 
 // Connect to MongoDB and RabbitMQ
 mongoose.connect(config.MONGODB_URI)
-  .then(async () => {
+  .then(() => {
     console.log('Connected to MongoDB');
-    
+  })
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
+  })
+  .then(async () => {
     // Initialize RabbitMQ connection
     await initRabbitMQ();
     

@@ -1,8 +1,8 @@
 import mongoose, { Schema } from 'mongoose';
-import { Dataset } from 'shared/types';
+import { DatasetModel } from 'shared/models';
 
 // Define the dataset schema
-const datasetSchema = new Schema<Dataset>({
+const datasetSchema = new Schema<typeof DatasetModel>({
   datasetId: { type: String, required: true, unique: true },
   status: { 
     type: String, 
@@ -18,4 +18,4 @@ const datasetSchema = new Schema<Dataset>({
 });
 
 // Create and export the dataset model
-export default mongoose.model<Dataset>('Dataset', datasetSchema);
+export default DatasetModel;
