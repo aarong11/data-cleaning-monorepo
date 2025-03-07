@@ -90,7 +90,6 @@ async function processDataset(job: DatasetProcessingJob) {
     
     // Update dataset status
     dataset.status = 'processed';
-    dataset.processedAt = new Date();
     await dataset.save();
     
     console.log(`Dataset ${job.datasetId} processed successfully with ${records.length} records`);

@@ -14,7 +14,6 @@ const datasetSchema = new Schema<Dataset>({
   size: { type: Number, required: true },
   link: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
-  processedAt: { type: Date },
   userId: { type: String, required: true }
 });
 

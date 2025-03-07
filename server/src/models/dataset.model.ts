@@ -33,9 +33,6 @@ const DatasetSchema = new Schema<Dataset>({
   userId: {
     type: String,
     required: true,
-  },
-  processedAt: {
-    type: Date
   }
 });
 
