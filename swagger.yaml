@@ -1,0 +1,337 @@
+openapi: 3.0.0
+info:
+  title: Dataset Cleaning API
+  description: API for uploading, processing, and reviewing datasets with AI cleaning
+  version: 1.0.0
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    DatasetResponse:
+      type: object
+      properties:
+        datasetId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        status:
+          type: string
+          enum: [uploaded, processing, processed, reviewing, completed]
+          example: "uploaded"
+        filename:
+          type: string
+          example: "products.csv"
+        size:
+          type: integer
+          example: 2048576
+        link:
+          type: string
+          example: "s3://org-name/bucketname/a.csv"
+        uploadedAt:
+          type: string
+          format: date-time
+          example: "2025-03-06T12:00:00Z"
+          
+    DatasetList:
+      type: object
+      properties:
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetResponse'
+            
+    DeleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Dataset deleted successfully."
+          
+    ProcessingResponse:
+      type: object
+      properties:
+        datasetId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        status:
+          type: string
+          example: "processing"
+        message:
+          type: string
+          example: "Dataset cleaning has started."
+          
+    RecordsList:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+                example: 0
+              name:
+                type: string
+                example: "John Doe"
+              name_changed:
+                type: boolean
+                example: true
+              name_new:
+                type: string
+                example: "Johnathan Doe"
+              email:
+                type: string
+                example: "john@example.com"
+              email_changed:
+                type: boolean
+                example: false
+              
+    ReviewDecision:
+      type: object
+      properties:
+        approved:
+          type: boolean
+          example: true
+        comments:
+          type: string
+          example: "Looks good."
+          
+    ReviewResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Review submitted successfully."
+          
+    ReviewProgress:
+      type: object
+      properties:
+        datasetId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        totalRecords:
+          type: integer
+          example: 1000
+        reviewedRecords:
+          type: integer
+          example: 500
+        progress:
+          type: integer
+          example: 50
+          
+    CompleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Review process completed successfully."
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/datasets/upload:
+    post:
+      summary: Upload Dataset
+      description: Uploads a CSV file for processing. Supports resumable uploads.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        200:
+          description: Dataset uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetResponse'
+
+  /api/datasets:
+    get:
+      summary: List User Datasets
+      description: Retrieves a list of datasets uploaded by the authenticated user.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: Number of datasets to return (default 10)
+          required: false
+        - in: query
+          name: offset
+          schema:
+            type: integer
+          description: Pagination offset
+          required: false
+      responses:
+        200:
+          description: List of datasets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetList'
+
+  /api/datasets/{datasetId}:
+    get:
+      summary: Get Dataset Details
+      description: Retrieves metadata and status for a specific dataset.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: Dataset details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetResponse'
+    
+    delete:
+      summary: Delete Dataset
+      description: Deletes a dataset if it hasn't been processed yet.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: Dataset deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+  
+  /api/datasets/{datasetId}/process:
+    post:
+      summary: Trigger Data Cleaning
+      description: Starts dataset cleaning using the AI model.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: Data processing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingResponse'
+  
+  /api/review/{datasetId}/records:
+    get:
+      summary: List Records for Review
+      description: Retrieves paginated records for review, referencing each record by its index.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: List of records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordsList'
+  
+  /api/review/{datasetId}/records/{index}:
+    post:
+      summary: Submit Review Decision
+      description: User approves/rejects AI-modified values with optional comments.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+        - in: path
+          name: index
+          schema:
+            type: integer
+          required: true
+          description: Index of the record (starting at 0)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecision'
+      responses:
+        200:
+          description: Review submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+  
+  /api/review/{datasetId}/progress:
+    get:
+      summary: Check Review Progress
+      description: Retrieves the percentage of records reviewed.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: Review progress information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewProgress'
+  
+  /api/review/{datasetId}/complete:
+    post:
+      summary: Finalize Review
+      description: Marks dataset review as complete.
+      parameters:
+        - in: path
+          name: datasetId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: Unique dataset ID
+      responses:
+        200:
+          description: Review completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteResponse'
