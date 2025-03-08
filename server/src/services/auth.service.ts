@@ -1,9 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { User } from 'shared';
-import { UserModel } from 'shared/models';
-
-import { AuthResponse, LoginRequest, RegisterRequest, UserResponse } from 'shared';
+import { User, AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserModel } from 'shared';
 import config from '../config';
 
 export class AuthService {

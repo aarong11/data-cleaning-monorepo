@@ -6,12 +6,14 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
+    role: 'admin' | 'manager' | 'editor' | 'viewer' | 'dataCleaner';
   };
 }
 
 interface JWTPayload {
   userId: string;
   email: string;
+  role: 'admin' | 'manager' | 'editor' | 'viewer' | 'dataCleaner';
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {

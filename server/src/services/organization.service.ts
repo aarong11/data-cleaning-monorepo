@@ -1,4 +1,4 @@
-import { OrganizationModel, UserModel } from 'shared/models';
+import { OrganizationModel, UserModel } from 'shared';
 
 export interface UserResponse {
   userId: string;
