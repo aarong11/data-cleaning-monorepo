@@ -4,5 +4,25 @@
       "server",
       "shared",
       "worker"
-    ]
-  }
+    ],
+    "scripts": {
+        "build": "yarn workspaces run build",
+        "build:server": "yarn workspace server build",
+        "build:worker": "yarn workspace worker build",
+        "start": "concurrently \"yarn start:server\" \"yarn start:worker\"",
+        "start:server": "yarn workspace server start",
+        "start:worker": "yarn workspace worker start",
+        "dev": "concurrently \"yarn dev:server\" \"yarn dev:worker\"",
+        "dev:server": "yarn workspace server dev",
+        "dev:worker": "yarn workspace worker watch",
+        "init-db": "yarn workspace server init-db",
+        "docker:up": "docker-compose up",
+        "docker:up:d": "docker-compose up -d",
+        "docker:down": "docker-compose down",
+        "docker:build": "docker-compose build",
+        "docker:logs": "docker-compose logs -f"
+    },
+    "devDependencies": {
+        "concurrently": "^8.0.0"
+    }
+}

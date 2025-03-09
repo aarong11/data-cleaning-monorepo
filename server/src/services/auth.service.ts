@@ -20,7 +20,7 @@ export class AuthService {
         userId: uuidv4(),
         email: userData.email,
         password: userData.password,
-        role: userData.role || 'user',
+        role: userData.role || 'viewer', // Changed from 'user' to 'viewer' to match schema enum values
         createdAt: new Date()
       });
 

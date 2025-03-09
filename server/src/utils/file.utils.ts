@@ -5,9 +5,13 @@ import config from '../config';
 import { parse } from 'csv-parse';
 import { S3 } from 'aws-sdk';
 
-// Configure the AWS SDK
+// Configure S3 client for R2
 const s3 = new S3({
-  region: config.S3_REGION
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  accessKeyId: process.env.R2_ACCESS_KEY_ID,
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  signatureVersion: 'v4',
+  region: config.S3_REGION,
 });
 
 // Ensure upload directory exists
@@ -34,6 +38,8 @@ export const uploadToS3 = async (
     Key: filename,
     Body: fileBuffer
   };
+
+  console.log(params);
 
   const uploadResult = await s3.upload(params).promise();
   return uploadResult.Location;

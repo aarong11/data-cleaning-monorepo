@@ -1,35 +1,31 @@
 import amqp from 'amqplib';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import path from 'path';
 import AWS from 'aws-sdk';
-import { DatasetProcessingJob, QUEUES } from 'shared/types';
+import { DatasetProcessingJob, QUEUES } from 'shared';
 import { parseCSV, processRecordsWithAI } from './utils/file.utils';
-import DatasetModel from './models/dataset.model';
-import RecordModel from './models/record.model';
-
-// Load environment variables
-dotenv.config();
-
-// Configuration
-const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/upload-service';
-
-// Configure AWS S3
-const s3 = new AWS.S3({
-  region: process.env.S3_REGION || 'us-east-1'
-});
+import { DatasetModel, RecordModel } from 'shared';
+import config from './config';
 
 // Connect to MongoDB
 async function connectToMongoDB() {
   try {
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(config.MONGODB_URI);
     console.log('Worker connected to MongoDB');
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
   }
 }
+
+// Configure S3 client for R2
+const s3 = new AWS.S3({
+  endpoint: `https://${config.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  accessKeyId: config.R2_ACCESS_KEY_ID,
+  secretAccessKey: config.R2_SECRET_ACCESS_KEY,
+  signatureVersion: 'v4',
+  region: config.S3_REGION || 'auto'
+});
 
 // Download file from S3
 async function downloadFromS3(fileUrl: string, localPath: string): Promise<void> {
@@ -68,7 +64,7 @@ async function processDataset(job: DatasetProcessingJob) {
 
   try {
     // Download file from S3
-    const localFilePath = path.join('/tmp', path.basename(dataset.link));
+    const localFilePath = path.join(config.UPLOAD_DIR, path.basename(dataset.link));
     await downloadFromS3(dataset.link, localFilePath);
     
     // Parse CSV file
@@ -109,7 +105,7 @@ async function startWorker() {
   
   try {
     // Connect to RabbitMQ
-    const connection = await amqp.connect(RABBITMQ_URL);
+    const connection = await amqp.connect(config.RABBITMQ_URL);
     const channel = await connection.createChannel();
     
     // Make sure queue exists

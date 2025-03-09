@@ -12,8 +12,11 @@
     "baseUrl": ".",
     "composite": true,
     "paths": {
-        "shared/*": ["node_modules/shared/dist/*"]
+        "shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../shared" }
+  ]
 }

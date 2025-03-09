@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { parse } from 'csv-parse';
-import { RecordProcessingResult } from 'shared/types';
+import { RecordProcessingResult } from 'shared';
 
 /**
  * Parse a CSV file and return records
