@@ -3,30 +3,46 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../../src/index';
 import supertest from 'supertest';
 import * as rabbitmq from '../../src/config/rabbitmq';
+import sinon from 'sinon';
 
-// Mock RabbitMQ functions
-jest.mock('../../src/config/rabbitmq', () => ({
-  initRabbitMQ: jest.fn().mockResolvedValue(undefined),
-  closeRabbitMQ: jest.fn().mockResolvedValue(undefined),
-  publishToQueue: jest.fn().mockResolvedValue(undefined),
-}));
+// Mock RabbitMQ functions with Sinon
+sinon.stub(rabbitmq, 'initRabbitMQ').resolves(undefined);
+sinon.stub(rabbitmq, 'closeRabbitMQ').resolves(undefined);
+sinon.stub(rabbitmq, 'sendToQueue').resolves(true);
 
 // Create a supertest client
 export const request = supertest(app);
-
 let mongoServer: MongoMemoryServer;
 
 // Setup before all tests
 export const setupTestDB = async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  await mongoose.connect(mongoUri);
+  try {
+    // Close existing connection if it exists
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+    
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+  } catch (error) {
+    console.error('Error setting up test database:', error);
+    throw error;
+  }
 };
 
 // Cleanup after all tests
 export const teardownTestDB = async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  try {
+    await mongoose.disconnect();
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
+    // Restore sinon stubs
+    sinon.restore();
+  } catch (error) {
+    console.error('Error tearing down test database:', error);
+  }
 };
 
 // Create a test user and return auth token

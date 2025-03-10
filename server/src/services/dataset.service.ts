@@ -1,16 +1,65 @@
 import { v4 as uuidv4 } from 'uuid';
-import { DatasetModel, RecordModel, Dataset as DatasetType, DatasetStatus, RecordResponse, Record as RecordType, DatasetProcessingJob, QUEUES } from 'shared';
-import { parseCSV, processRecordsWithAI } from '../utils/file.utils';
+import { DatasetModel, RecordModel, OrganizationModel, Dataset as DatasetType, DatasetStatus, RecordResponse, Record as RecordType, DatasetProcessingJob, QUEUES } from 'shared';
+import { parseCSV, processRecordsWithAI, getFileStreamFromS3 } from '../utils/file.utils';
 import path from 'path';
 import { sendToQueue } from '../config/rabbitmq';
 
+/**
+ * Service class responsible for dataset operations including creation, retrieval, 
+ * processing, and review management
+ */
 export class DatasetService {
-  async createDataset(userId: string, filename: string, size: number, link: string): Promise<DatasetType> {
+  /**
+   * Checks if a user has permission to access a specific dataset
+   * 
+   * @param datasetId - The unique identifier of the dataset
+   * @param userId - The unique identifier of the user
+   * @returns Boolean indicating whether the user can access the dataset
+   */
+  private async canAccessDataset(datasetId: string, userId: string): Promise<boolean> {
+    const dataset = await DatasetModel.findOne({ datasetId });
+    if (!dataset) return false;
+
+    // If user is the owner, they can access it
+    if (dataset.userId === userId) return true;
+
+    // Check if user is in the organization that owns the dataset
+    const organization = await OrganizationModel.findOne({ 
+      organizationId: dataset.organizationId,
+      'members.userId': userId 
+    });
+
+    return !!organization;
+  }
+
+  /**
+   * Creates a new dataset record in the database
+   * 
+   * @param userId - The ID of the user creating the dataset
+   * @param organizationId - The organization the dataset belongs to
+   * @param filename - The original filename of the dataset
+   * @param size - The size of the file in bytes
+   * @param link - The S3 link where the dataset is stored
+   * @returns The created dataset object
+   * @throws Error if the user doesn't belong to the specified organization
+   */
+  async createDataset(userId: string, organizationId: string, filename: string, size: number, link: string): Promise<DatasetType> {
     const datasetId = uuidv4();
+    
+    // Verify user belongs to organization
+    const organization = await OrganizationModel.findOne({ 
+      organizationId,
+      'members.userId': userId 
+    });
+    
+    if (!organization) {
+      throw new Error('User does not belong to the specified organization');
+    }
     
     const dataset = new DatasetModel({
       datasetId,
       userId,
+      organizationId,
       filename,
       size,
       link,
@@ -22,19 +71,54 @@ export class DatasetService {
     return dataset;
   }
 
+  /**
+   * Retrieves datasets accessible to a specific user with pagination
+   * 
+   * @param userId - The ID of the user
+   * @param limit - Maximum number of datasets to return (default: 10)
+   * @param offset - Number of datasets to skip (default: 0)
+   * @returns Array of dataset objects
+   */
   async getDatasetsByUserId(userId: string, limit = 10, offset = 0): Promise<DatasetType[]> {
-    return DatasetModel.find({ userId })
+    // Get user's organizations
+    const organizations = await OrganizationModel.find({ 'members.userId': userId });
+    const orgIds = organizations.map(org => org.organizationId);
+
+    // Find datasets where user is either owner or member of the organization
+    return DatasetModel.find({
+      $or: [
+        { userId },
+        { organizationId: { $in: orgIds } }
+      ]
+    })
       .sort({ uploadedAt: -1 })
       .skip(offset)
       .limit(limit);
   }
 
-  async getDatasetById(datasetId: string): Promise<DatasetType | null> {
+  /**
+   * Retrieves a specific dataset if the user has access to it
+   * 
+   * @param datasetId - The ID of the dataset to retrieve
+   * @param userId - The ID of the user making the request
+   * @returns The dataset object if found and accessible, null otherwise
+   */
+  async getDatasetById(datasetId: string, userId: string): Promise<DatasetType | null> {
+    if (!await this.canAccessDataset(datasetId, userId)) {
+      return null;
+    }
     return DatasetModel.findOne({ datasetId });
   }
 
+  /**
+   * Deletes a dataset if it's in the 'uploaded' state and the user has access
+   * 
+   * @param datasetId - The ID of the dataset to delete
+   * @param userId - The ID of the user making the delete request
+   * @returns Boolean indicating success or failure
+   */
   async deleteDatasetById(datasetId: string, userId: string): Promise<boolean> {
-    const dataset = await DatasetModel.findOne({ datasetId, userId });
+    const dataset = await DatasetModel.findOne({ datasetId });
     
     if (!dataset) {
       return false;
@@ -44,11 +128,23 @@ export class DatasetService {
     if (dataset.status !== 'uploaded') {
       return false;
     }
+
+    // Verify access rights
+    if (!await this.canAccessDataset(datasetId, userId)) {
+      return false;
+    }
     
     await DatasetModel.deleteOne({ datasetId });
     return true;
   }
 
+  /**
+   * Starts the processing of a dataset by sending a job to the processing queue
+   * 
+   * @param datasetId - The ID of the dataset to process
+   * @param userId - The ID of the user making the request
+   * @returns The updated dataset object if processing was initiated, null otherwise
+   */
   async processDataset(datasetId: string, userId: string): Promise<DatasetType | null> {
     const dataset = await DatasetModel.findOne({ datasetId, userId });
     
@@ -93,15 +189,25 @@ export class DatasetService {
     }
   }
 
+  /**
+   * Retrieves records from a dataset with pagination
+   * 
+   * @param datasetId - The ID of the dataset
+   * @param userId - The ID of the user making the request
+   * @param limit - Maximum number of records to return (default: 10)
+   * @param offset - Number of records to skip (default: 0)
+   * @returns Array of record objects with transformation data or null if access denied
+   */
   async getRecords(
     datasetId: string, 
     userId: string, 
     limit = 10, 
     offset = 0
   ): Promise<RecordResponse[] | null> {
-    // Verify dataset exists and belongs to user
-    const dataset = await DatasetModel.findOne({ datasetId, userId });
-    if (!dataset) return null;
+    // Verify dataset access rights
+    if (!await this.canAccessDataset(datasetId, userId)) {
+      return null;
+    }
 
     const records = await RecordModel.find({ datasetId })
       .sort({ index: 1 })
@@ -124,6 +230,16 @@ export class DatasetService {
     });
   }
 
+  /**
+   * Submits a review decision for a specific record in a dataset
+   * 
+   * @param datasetId - The ID of the dataset
+   * @param userId - The ID of the user submitting the review
+   * @param index - The index of the record being reviewed
+   * @param approved - Whether the record is approved or rejected
+   * @param comments - Optional comments for the review decision
+   * @returns Boolean indicating success or failure
+   */
   async submitReviewDecision(
     datasetId: string,
     userId: string,
@@ -158,6 +274,13 @@ export class DatasetService {
     return true;
   }
 
+  /**
+   * Gets the progress of the review process for a dataset
+   * 
+   * @param datasetId - The ID of the dataset
+   * @param userId - The ID of the user requesting progress
+   * @returns Object with progress statistics or null if access is denied
+   */
   async getReviewProgress(datasetId: string, userId: string): Promise<{ 
     totalRecords: number; 
     reviewedRecords: number; 
@@ -179,6 +302,13 @@ export class DatasetService {
     };
   }
 
+  /**
+   * Completes the review process for a dataset if all records have been reviewed
+   * 
+   * @param datasetId - The ID of the dataset
+   * @param userId - The ID of the user completing the review
+   * @returns Boolean indicating success or failure
+   */
   async completeReview(datasetId: string, userId: string): Promise<boolean> {
     // Verify dataset exists and belongs to user
     const dataset = await DatasetModel.findOne({ datasetId, userId });
@@ -197,5 +327,27 @@ export class DatasetService {
     await dataset.save();
     
     return true;
+  }
+
+  /**
+   * Creates a readable stream for downloading a dataset file
+   * 
+   * @param datasetId - The ID of the dataset
+   * @param userId - The ID of the user requesting the download
+   * @returns A readable stream of the dataset file
+   * @throws Error if access is denied or dataset is not found
+   */
+  async getDatasetStream(datasetId: string, userId: string): Promise<NodeJS.ReadableStream> {
+    if (!await this.canAccessDataset(datasetId, userId)) {
+      throw new Error('Unauthorized access to dataset');
+    }
+
+    const dataset = await DatasetModel.findOne({ datasetId });
+    if (!dataset) {
+      throw new Error('Dataset not found');
+    }
+
+    // Get stream from S3
+    return await getFileStreamFromS3(dataset.link);
   }
 }

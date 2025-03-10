@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { User, AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserModel } from 'shared';
+import { User, AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserModel, UserOrganization, OrganizationModel } from 'shared';
 import config from '../config';
 
 export class AuthService {
@@ -36,7 +36,8 @@ export class AuthService {
         user: {
           userId: user.userId,
           email: user.email,
-          role: user.role
+          role: user.role,
+          organizations: [] // New user has no organizations initially
         }
       };
     } catch (error) {
@@ -69,13 +70,17 @@ export class AuthService {
       // Generate JWT token using userId
       const token = this.generateToken(user.userId, user.email);
 
+      // Get user's organizations
+      const userOrgs = await this.getUserOrganizations(user.userId);
+
       // Return user info and token
       return {
         token,
         user: {
           userId: user.userId,
           email: user.email,
-          role: user.role
+          role: user.role,
+          organizations: userOrgs
         }
       };
     } catch (error) {
@@ -106,14 +111,50 @@ export class AuthService {
         return null;
       }
 
+      // Get user's organizations
+      const userOrgs = await this.getUserOrganizations(userId);
+
       return {
         userId: user.userId,
         email: user.email,
-        role: user.role
+        role: user.role,
+        organizations: userOrgs
       };
     } catch (error) {
       console.error('Error getting user:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get organizations that a user belongs to with their roles
+   */
+  private async getUserOrganizations(userId: string): Promise<UserOrganization[]> {
+    try {
+      // Find user to get organization IDs
+      const user = await UserModel.findOne({ userId });
+      if (!user || !user.organizations || user.organizations.length === 0) {
+        return [];
+      }
+
+      // Find all organizations that this user is a member of
+      const organizations = await OrganizationModel.find({ 
+        organizationId: { $in: user.organizations }
+      });
+
+      return organizations.map(org => {
+        // Find the user's role in this organization
+        const memberInfo = org.members.find(m => m.userId === userId);
+        return {
+          organizationId: org.organizationId,
+          organizationName: org.organizationName,
+          organizationDescription: org.organizationDescription,
+          role: memberInfo?.role || 'viewer' // Default to viewer if role not found
+        };
+      });
+    } catch (error) {
+      console.error('Error getting user organizations:', error);
+      return [];
     }
   }
 }

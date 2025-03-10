@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
   title: Dataset Cleaning API
-  description: API for uploading, processing, and reviewing datasets with AI cleaning
-  version: 1.0.0
+  description: API for uploading, processing, reviewing datasets with AI cleaning and organization management
+  version: 1.1.0
 
 components:
   securitySchemes:
@@ -36,7 +36,7 @@ components:
           type: string
           format: date-time
           example: "2025-03-06T12:00:00Z"
-          
+
     DatasetList:
       type: object
       properties:
@@ -196,6 +196,106 @@ components:
           type: string
           example: "ok"
 
+    Organization:
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        organizationName:
+          type: string
+          example: "My Organization"
+        organizationDescription:
+          type: string
+          example: "A detailed description of the organization"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-01-01T00:00:00Z"
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberResponse'
+
+    OrganizationsList:
+      type: object
+      properties:
+        organizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+
+    CreateOrganizationRequest:
+      type: object
+      properties:
+        organizationName:
+          type: string
+          example: "My Organization"
+        organizationDescription:
+          type: string
+          example: "A detailed description of the organization"
+      required:
+        - organizationName
+        - organizationDescription
+
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        organizationName:
+          type: string
+          example: "Updated Organization Name"
+        organizationDescription:
+          type: string
+          example: "Updated organization description"
+      required:
+        - organizationName
+        - organizationDescription
+
+    AddMemberRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+          example: "editor"
+      required:
+        - userId
+        - role
+
+    UpdateMemberRoleRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+          example: "admin"
+      required:
+        - role
+
+    MemberResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        role:
+          type: string
+          enum: [admin, editor, viewer]
+          example: "editor"
+
 security:
   - bearerAuth: []
 
@@ -268,6 +368,7 @@ paths:
       summary: Upload Dataset
       description: Uploads a CSV file for processing. Supports resumable uploads.
       requestBody:
+        required: true
         content:
           multipart/form-data:
             schema:
@@ -330,7 +431,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DatasetResponse'
-    
     delete:
       summary: Delete Dataset
       description: Deletes a dataset if it hasn't been processed yet.
@@ -370,7 +470,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProcessingResponse'
   
-  /api/review/{datasetId}/records:
+  /api/datasets/{datasetId}/records:
     get:
       summary: List Records for Review
       description: Retrieves paginated records for review, referencing each record by its index.
@@ -382,6 +482,18 @@ paths:
             format: uuid
           required: true
           description: Unique dataset ID
+        - in: query
+          name: page
+          schema:
+            type: integer
+          required: false
+          description: Page number (starts at 0)
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+          required: false
+          description: Number of records per page (default 10)
       responses:
         200:
           description: List of records
@@ -390,7 +502,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RecordsList'
   
-  /api/review/{datasetId}/records/{index}:
+  /api/datasets/{datasetId}/records/{index}/review:
     post:
       summary: Submit Review Decision
       description: User approves/rejects AI-modified values with optional comments.
@@ -409,6 +521,7 @@ paths:
           required: true
           description: Index of the record (starting at 0)
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -421,7 +534,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReviewResponse'
   
-  /api/review/{datasetId}/progress:
+  /api/datasets/{datasetId}/progress:
     get:
       summary: Check Review Progress
       description: Retrieves the percentage of records reviewed.
@@ -441,7 +554,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReviewProgress'
   
-  /api/review/{datasetId}/complete:
+  /api/datasets/{datasetId}/complete:
     post:
       summary: Finalize Review
       description: Marks dataset review as complete.
@@ -460,3 +573,187 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CompleteResponse'
+
+  /api/organizations:
+    get:
+      summary: List Organizations
+      description: Retrieves a list of organizations the user has access to.
+      responses:
+        200:
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationsList'
+    post:
+      summary: Create Organization
+      description: Creates a new organization (admin only).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        201:
+          description: Organization created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+  /api/organizations/{organizationId}:
+    get:
+      summary: Get Organization Details
+      description: Retrieves details for a specific organization (requires viewer role or above).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+      responses:
+        200:
+          description: Organization details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+    put:
+      summary: Update Organization
+      description: Updates an existing organization's information (requires admin role).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationRequest'
+      responses:
+        200:
+          description: Organization updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+    delete:
+      summary: Delete Organization
+      description: Deletes an organization by its ID (requires admin role).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+      responses:
+        200:
+          description: Organization deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Organization deleted successfully."
+
+  /api/organizations/{organizationId}/members:
+    post:
+      summary: Add User to Organization
+      description: Adds a user to the organization with a specific role (requires admin role).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberRequest'
+      responses:
+        200:
+          description: User added to organization successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+
+  /api/organizations/{organizationId}/members/{userId}:
+    delete:
+      summary: Remove User from Organization
+      description: Removes a user from the organization (requires admin role).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique user ID
+      responses:
+        200:
+          description: User removed from organization successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User removed from organization successfully."
+
+  /api/organizations/{organizationId}/members/{userId}/role:
+    put:
+      summary: Update User Role in Organization
+      description: Updates a user's role within the organization (requires admin role).
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique organization ID
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique user ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRoleRequest'
+      responses:
+        200:
+          description: User role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'

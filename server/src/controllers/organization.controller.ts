@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { OrganizationService, CreateOrganizationRequest } from '../services/organization.service';
+import { OrganizationService, CreateOrganizationRequest, AddMemberRequest } from '../services/organization.service';
 
 const organizationService = new OrganizationService();
 
@@ -40,8 +40,8 @@ export class OrganizationController {
   async addUserToOrganization(req: AuthRequest, res: Response) {
     try {
       const { organizationId } = req.params;
-      const { email } = req.body;
-      const organization = await organizationService.addUserToOrganization(organizationId, email);
+      const memberData: AddMemberRequest = req.body;
+      const organization = await organizationService.addUserToOrganization(organizationId, memberData);
       res.json(organization);
     } catch (error) {
       res.status(400).json({ message: 'Error adding user to organization', error: (error as Error).message });
@@ -55,6 +55,22 @@ export class OrganizationController {
       res.json(organization);
     } catch (error) {
       res.status(400).json({ message: 'Error removing user from organization', error: (error as Error).message });
+    }
+  }
+
+  async updateMemberRole(req: AuthRequest, res: Response) {
+    try {
+      const { organizationId, userId } = req.params;
+      const { role } = req.body;
+      
+      if (!role || !['admin', 'editor', 'viewer'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role specified' });
+      }
+
+      const organization = await organizationService.updateMemberRole(organizationId, userId, role);
+      res.json(organization);
+    } catch (error) {
+      res.status(400).json({ message: 'Error updating member role', error: (error as Error).message });
     }
   }
 }

@@ -35,4 +35,7 @@ router.get('/:datasetId/progress', datasetController.getReviewProgress.bind(data
 // Complete review
 router.post('/:datasetId/complete', datasetController.completeReview.bind(datasetController));
 
+// Download dataset
+router.get('/:datasetId/download', datasetController.downloadDataset.bind(datasetController));
+
 export default router;

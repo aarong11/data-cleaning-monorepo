@@ -3,7 +3,8 @@ import { OrganizationModel, UserModel } from 'shared';
 export interface UserResponse {
   userId: string;
   email: string;
-  role: string;
+  role: 'admin' | 'editor' | 'viewer' | 'manager' | 'dataCleaner';
+  organizationRole: 'admin' | 'editor' | 'viewer';
 }
 
 export interface OrganizationResponse {
@@ -19,9 +20,17 @@ export interface CreateOrganizationRequest {
   organizationDescription: string;
 }
 
+export interface AddMemberRequest {
+  email: string;
+  role: 'admin' | 'editor' | 'viewer';
+}
+
 export class OrganizationService {
   async createOrganization(data: CreateOrganizationRequest, userId: string): Promise<OrganizationResponse> {
-    const organization = await OrganizationModel.create(data);
+    const organization = await OrganizationModel.create({
+      ...data,
+      members: [{ userId, role: 'admin' }]
+    });
     
     // Add creator to organization
     await UserModel.findOneAndUpdate(
@@ -43,12 +52,30 @@ export class OrganizationService {
     );
   }
 
-  async addUserToOrganization(organizationId: string, userEmail: string): Promise<OrganizationResponse> {
-    const user = await UserModel.findOne({ email: userEmail });
+  async addUserToOrganization(organizationId: string, request: AddMemberRequest): Promise<OrganizationResponse> {
+    const user = await UserModel.findOne({ email: request.email });
     if (!user) {
       throw new Error('User not found');
     }
 
+    const organization = await OrganizationModel.findOne({ organizationId });
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
+
+    // Check if user is already a member
+    if (organization.members.some(m => m.userId === user.userId)) {
+      throw new Error('User is already a member of this organization');
+    }
+
+    // Add member with role
+    organization.members.push({
+      userId: user.userId,
+      role: request.role
+    });
+    await organization.save();
+
+    // Add organization to user's organizations
     await UserModel.findOneAndUpdate(
       { userId: user.userId },
       { $addToSet: { organizations: organizationId } }
@@ -58,10 +85,37 @@ export class OrganizationService {
   }
 
   async removeUserFromOrganization(organizationId: string, userId: string): Promise<OrganizationResponse> {
+    const organization = await OrganizationModel.findOne({ organizationId });
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
+
+    // Remove member
+    organization.members = organization.members.filter(m => m.userId !== userId);
+    await organization.save();
+
+    // Remove organization from user's organizations
     await UserModel.findOneAndUpdate(
       { userId },
       { $pull: { organizations: organizationId } }
     );
+
+    return this.getOrganizationResponseById(organizationId);
+  }
+
+  async updateMemberRole(organizationId: string, userId: string, role: 'admin' | 'editor' | 'viewer'): Promise<OrganizationResponse> {
+    const organization = await OrganizationModel.findOne({ organizationId });
+    if (!organization) {
+      throw new Error('Organization not found');
+    }
+
+    const memberIndex = organization.members.findIndex(m => m.userId === userId);
+    if (memberIndex === -1) {
+      throw new Error('User is not a member of this organization');
+    }
+
+    organization.members[memberIndex].role = role;
+    await organization.save();
 
     return this.getOrganizationResponseById(organizationId);
   }
@@ -72,19 +126,26 @@ export class OrganizationService {
       throw new Error('Organization not found');
     }
 
-    const users = await UserModel.find({ organizations: organizationId });
-    const members = users.map(user => ({
-      userId: user.userId,
-      email: user.email,
-      role: user.role
-    }));
+    // Get all member details
+    const memberDetails = await Promise.all(
+      organization.members.map(async (member) => {
+        const user = await UserModel.findOne({ userId: member.userId });
+        if (!user) return null;
+        return {
+          userId: user.userId,
+          email: user.email,
+          role: user.role,
+          organizationRole: member.role
+        };
+      })
+    );
 
     return {
       organizationId: organization.organizationId,
       organizationName: organization.organizationName,
       organizationDescription: organization.organizationDescription,
       createdAt: organization.createdAt,
-      members
+      members: memberDetails.filter((m): m is UserResponse => m !== null)
     };
   }
 }
