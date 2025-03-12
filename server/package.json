@@ -2,7 +2,7 @@
   "name": "server",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "commercial",
+  "license": "GPL-3.0",
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
